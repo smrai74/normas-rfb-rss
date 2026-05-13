@@ -7,7 +7,7 @@ Como funciona:
   1. Busca na Seção 1 do DOU pelo órgão "Receita Federal do Brasil"
   2. Gera um feed RSS 2.0 válido em docs/feed.xml
   3. O GitHub Actions roda este script todo dia útil e faz deploy no GitHub Pages
-  4. O InoReader assina a URL pública: https://<usuario>.github.io/<repo>/feed.xml
+  4. O InoReader assina a URL pública: https://smrai74.github.io/normas-rfb-rss/feed.xml
 """
 
 import json
@@ -23,7 +23,7 @@ from xml.dom import minidom
 # ── configurações ──────────────────────────────────────────────────────────────
 
 # Quantos dias para trás buscar (1 = só hoje, 7 = última semana)
-DIAS_BUSCA = 7
+DIAS_BUSCA = 1
 
 # Seções do DOU: "do1" = Seção 1 (atos normativos), "do1_extra" = edições extras
 SECOES = ["do1", "do1_extra"]
