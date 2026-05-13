@@ -4,10 +4,11 @@ Gerador de RSS – Normas da Receita Federal no DOU
 Consulta a API da Imprensa Nacional e gera docs/feed.xml
 
 Como funciona:
-  1. Busca na Seção 1 do DOU pelo órgão "Receita Federal do Brasil"
-  2. Gera um feed RSS 2.0 válido em docs/feed.xml
-  3. O GitHub Actions roda este script todo dia útil e faz deploy no GitHub Pages
-  4. O InoReader assina a URL pública: https://smrai74.github.io/normas-rfb-rss/feed.xml
+  1. Lê last_run.txt para saber quando rodou pela última vez
+  2. Busca atos da RFB publicados desde então
+  3. Gera docs/feed.xml e salva a hora atual em last_run.txt
+  4. O GitHub Actions commita tudo e faz deploy no GitHub Pages
+  5. O InoReader assina: https://<usuario>.github.io/<repo>/feed.xml
 """
 
 import json
@@ -22,8 +23,8 @@ from xml.dom import minidom
 
 # ── configurações ──────────────────────────────────────────────────────────────
 
-# Quantos dias para trás buscar (1 = só hoje, 7 = última semana)
-DIAS_BUSCA = 1
+# Fallback: quantos dias buscar se last_run.txt não existir (primeira execução)
+DIAS_FALLBACK = 1
 
 # Seções do DOU: "do1" = Seção 1 (atos normativos), "do1_extra" = edições extras
 SECOES = ["do1", "do1_extra"]
@@ -37,8 +38,9 @@ MAX_ITENS = 50
 # URL do seu feed (atualize após criar o repositório)
 FEED_URL = "https://SEU_USUARIO.github.io/SEU_REPO/feed.xml"
 
-# Arquivo de saída
-SAIDA = Path("docs/feed.xml")
+# Arquivos
+SAIDA      = Path("docs/feed.xml")
+LAST_RUN   = Path("last_run.txt")
 
 # ── funções ────────────────────────────────────────────────────────────────────
 
@@ -158,29 +160,51 @@ def buscar_via_pesquisa(data_inicio: str, data_fim: str) -> list[dict]:
         return []
 
 
+def ler_last_run() -> datetime:
+    """Lê a data/hora da última execução de last_run.txt. Usa fallback se não existir."""
+    if LAST_RUN.exists():
+        try:
+            ts = LAST_RUN.read_text().strip()
+            dt = datetime.fromisoformat(ts)
+            print(f"  Última execução: {dt.strftime('%d/%m/%Y %H:%M')}")
+            return dt
+        except ValueError:
+            pass
+    fallback = datetime.now() - timedelta(days=DIAS_FALLBACK)
+    print(f"  last_run.txt não encontrado. Usando fallback: últimas {DIAS_FALLBACK*24}h")
+    return fallback
+
+
+def salvar_last_run():
+    """Salva a data/hora atual em last_run.txt."""
+    LAST_RUN.write_text(datetime.now().isoformat())
+
+
 def coletar_artigos() -> list[dict]:
     """
-    Tenta primeiro o endpoint de pesquisa (mais preciso).
-    Se falhar, cai para leitura da edição do dia artigo por artigo.
+    Busca atos publicados desde a última execução.
+    Tenta primeiro o endpoint de pesquisa; se falhar, lê edição por edição.
     """
+    ultima = ler_last_run()
     hoje = datetime.now()
-    inicio = hoje - timedelta(days=DIAS_BUSCA - 1)
-    dt_inicio = inicio.strftime("%d-%m-%Y")
+
+    # Gera lista de datas a cobrir (da última execução até hoje)
+    dias_diff = (hoje.date() - ultima.date()).days + 1
+    dt_inicio = ultima.strftime("%d-%m-%Y")
     dt_fim = hoje.strftime("%d-%m-%Y")
 
-    print(f"  Tentando endpoint de pesquisa ({dt_inicio} → {dt_fim})…")
+    print(f"  Buscando de {dt_inicio} até {dt_fim} ({dias_diff} dia(s))…")
     artigos = buscar_via_pesquisa(dt_inicio, dt_fim)
 
     if artigos:
         print(f"  Encontrados {len(artigos)} artigos via pesquisa.")
-        # Filtra apenas da Receita Federal
         rfb = [a for a in artigos if ORGAO.lower() in a.get("orgao", "").lower()]
         resultado = rfb if rfb else artigos
     else:
-        print("  Pesquisa falhou ou sem resultado. Lendo edições do período…")
+        print("  Pesquisa falhou. Lendo edições do período…")
         vistos: set[str] = set()
         resultado = []
-        for dias_atras in range(DIAS_BUSCA):
+        for dias_atras in range(dias_diff):
             data_str = (hoje - timedelta(days=dias_atras)).strftime("%d-%m-%Y")
             for secao in SECOES:
                 print(f"  Lendo edição {data_str} / {secao}…")
@@ -279,7 +303,7 @@ def _xml(elem: Element) -> str:
 
 def main():
     print("=== Gerador RSS – Normas RFB ===")
-    print(f"Período: últimos {DIAS_BUSCA} dias | Órgão: {ORGAO}")
+    print(f"Órgão: {ORGAO}")
 
     artigos = coletar_artigos()
     print(f"Total final: {len(artigos)} artigos da RFB")
@@ -287,6 +311,9 @@ def main():
     SAIDA.parent.mkdir(parents=True, exist_ok=True)
     SAIDA.write_text(gerar_rss(artigos), encoding="utf-8")
     print(f"Feed salvo: {SAIDA}")
+
+    salvar_last_run()
+    print(f"last_run.txt atualizado: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 
 
 if __name__ == "__main__":
