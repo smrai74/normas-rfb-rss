@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+  <channel>
+    <title>Normas RFB – Diário Oficial da União</title>
+    <link>https://www.in.gov.br/consulta</link>
+    <description>Atos normativos da Receita Federal do Brasil publicados no DOU – atualizado automaticamente via GitHub Actions</description>
+    <language>pt-BR</language>
+    <lastBuildDate>Wed, 13 May 2026 19:53:09 +0000</lastBuildDate>
+    <atom:link href="https://SEU_USUARIO.github.io/SEU_REPO/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Nenhum resultado encontrado no período</title>
+      <link>https://www.in.gov.br/consulta</link>
+      <pubDate>Wed, 13 May 2026 19:53:09 +0000</pubDate>
+    </item>
+  </channel>
+</rss>
