@@ -8,7 +8,7 @@ Como funciona:
   2. Busca atos da RFB no DOU publicados desde então
   3. Gera docs/feed.xml e atualiza last_run.txt
   4. O GitHub Actions commita tudo e faz deploy no GitHub Pages
-  5. O InoReader assina: https://<usuario>.github.io/<repo>/feed.xml
+  5. O InoReader assina: https://smrai74.github.io/normas-rfb-rss/feed.xml
 """
 
 import json
@@ -35,7 +35,7 @@ ORG_SUB = "Secretaria Especial da Receita Federal do Brasil"
 MAX_ITENS = 50
 
 # URL do seu feed — atualize com seu usuário e repositório do GitHub
-FEED_URL = "https://SEU_USUARIO.github.io/normas-rfb-rss/feed.xml"
+FEED_URL = "https://https://smrai74.github.io/normas-rfb-rss/feed.xml"
 
 # Arquivos
 SAIDA    = Path("docs/feed.xml")
