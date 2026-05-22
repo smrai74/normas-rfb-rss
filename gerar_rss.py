@@ -14,11 +14,12 @@ Como funciona:
 import json
 import re
 import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
-from urllib.error import URLError
+from urllib.error import URLError, HTTPError
 from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom import minidom
 
@@ -35,7 +36,7 @@ ORG_SUB = "Secretaria Especial da Receita Federal do Brasil"
 MAX_ITENS = 50
 
 # URL do seu feed — atualize com seu usuário e repositório do GitHub
-FEED_URL = "https://https://smrai74.github.io/normas-rfb-rss/feed.xml"
+FEED_URL = "https://smrai74.github.io/normas-rfb-rss/feed.xml"
 
 # Arquivos
 SAIDA    = Path("docs/feed.xml")
@@ -59,6 +60,7 @@ def buscar_leiturajornal(data_str: str) -> list[dict]:
     """
     Busca atos da RFB usando o endpoint real do DOU filtrado por órgão.
     data_str formato: DD-MM-YYYY
+    Tenta até 3 vezes com delay entre tentativas.
     """
     params = urlencode({
         "org":     ORG,
@@ -66,14 +68,30 @@ def buscar_leiturajornal(data_str: str) -> list[dict]:
         "data":    data_str,
     })
     url = f"https://in.gov.br/leiturajornal?{params}"
-    print(f"  GET {url}")
+    
+    max_tentativas = 3
+    for tentativa in range(1, max_tentativas + 1):
+        print(f"  GET {url} (tentativa {tentativa}/{max_tentativas})")
 
-    try:
-        req = Request(url, headers=HEADERS)
-        with urlopen(req, timeout=25) as resp:
-            raw = resp.read().decode("utf-8")
-    except URLError as e:
-        print(f"  Erro de rede ({data_str}): {e}", file=sys.stderr)
+        try:
+            req = Request(url, headers=HEADERS)
+            with urlopen(req, timeout=30) as resp:
+                raw = resp.read().decode("utf-8")
+        except HTTPError as e:
+            if e.code == 502 and tentativa < max_tentativas:
+                print(f"  Servidor retornou 502. Aguardando 10s antes de tentar novamente…", file=sys.stderr)
+                time.sleep(10)
+                continue
+            print(f"  Erro HTTP {e.code} ({data_str}): {e}", file=sys.stderr)
+            return []
+        except URLError as e:
+            print(f"  Erro de rede ({data_str}): {e}", file=sys.stderr)
+            return []
+
+        # Parsing bem-sucedido
+        break
+    else:
+        print(f"  Falhou após {max_tentativas} tentativas", file=sys.stderr)
         return []
 
     # Tenta parse direto como JSON
@@ -116,6 +134,9 @@ def buscar_leiturajornal(data_str: str) -> list[dict]:
         })
 
     print(f"  {len(artigos)} atos encontrados para {data_str}")
+    
+    # Pequeno delay entre requisições para não sobrecarregar o servidor
+    time.sleep(2)
     return artigos
 
 
