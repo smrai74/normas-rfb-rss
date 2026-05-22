@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Gerador de RSS – Normas da Receita Federal no DOU
-https://github.com/smrai74/normas-rfb-rss
+Versão COM DEBUG para diagnosticar problemas
 """
 
 import json
@@ -36,39 +36,64 @@ def buscar_leiturajornal(data_str: str) -> list[dict]:
     """Busca atos da RFB no DOU filtrado por órgão."""
     params = urlencode({"org": ORG, "org_sub": ORG_SUB, "data": data_str})
     url = f"https://in.gov.br/leiturajornal?{params}"
-    print(f"  Buscando: {data_str}")
+    print(f"  [DEBUG] URL: {url}")
 
     try:
         req = Request(url, headers=HEADERS)
+        print(f"  [DEBUG] Headers: {dict(HEADERS)}", file=sys.stderr)
         with urlopen(req, timeout=30) as resp:
             raw = resp.read().decode("utf-8")
+            print(f"  [DEBUG] Status: {resp.status}", file=sys.stderr)
+            print(f"  [DEBUG] Content-Length: {len(raw)}", file=sys.stderr)
+            print(f"  [DEBUG] Primeiros 500 chars: {raw[:500]}", file=sys.stderr)
+    except HTTPError as e:
+        print(f"  [DEBUG] HTTPError {e.code}: {e}", file=sys.stderr)
+        return []
     except Exception as e:
-        print(f"    Erro: {e}", file=sys.stderr)
+        print(f"  [DEBUG] Erro: {type(e).__name__}: {e}", file=sys.stderr)
         return []
 
-    # Extrai JSON da resposta
+    # Tenta parse direto como JSON
+    print(f"  [DEBUG] Tentando JSON direto...", file=sys.stderr)
     try:
         data = json.loads(raw)
-    except:
+        print(f"  [DEBUG] ✓ JSON direto parseado", file=sys.stderr)
+        print(f"  [DEBUG] Tipo: {type(data)}, Chaves: {list(data.keys()) if isinstance(data, dict) else 'lista'}", file=sys.stderr)
+    except json.JSONDecodeError as e:
+        print(f"  [DEBUG] JSON direto falhou: {e}", file=sys.stderr)
+        print(f"  [DEBUG] Tentando extrair de <script>...", file=sys.stderr)
+        
         match = re.search(r'<script[^>]*type=["\']application/json["\'][^>]*>(.*?)</script>', raw, re.DOTALL)
         if not match:
+            print(f"  [DEBUG] Sem <script type=application/json> encontrado!", file=sys.stderr)
             return []
+        
         try:
-            data = json.loads(match.group(1))
-        except:
+            json_str = match.group(1)
+            print(f"  [DEBUG] JSON extraído, primeiros 300 chars: {json_str[:300]}", file=sys.stderr)
+            data = json.loads(json_str)
+            print(f"  [DEBUG] ✓ JSON de <script> parseado", file=sys.stderr)
+        except json.JSONDecodeError as e2:
+            print(f"  [DEBUG] JSON de <script> falhou: {e2}", file=sys.stderr)
             return []
 
     # Normaliza items
     if isinstance(data, list):
         items = data
+        print(f"  [DEBUG] Resposta é lista com {len(items)} items", file=sys.stderr)
     else:
+        print(f"  [DEBUG] Resposta é dict com chaves: {list(data.keys())}", file=sys.stderr)
         items = data.get("jsonArray") or data.get("content") or data.get("atos") or []
+        print(f"  [DEBUG] Items encontrados: {len(items)}", file=sys.stderr)
 
     artigos = []
-    for item in items:
+    for i, item in enumerate(items):
         url_title = item.get("urlTitle", "")
         if not url_title:
+            print(f"  [DEBUG] Item {i}: sem urlTitle", file=sys.stderr)
             continue
+        
+        print(f"  [DEBUG] Item {i}: urlTitle={url_title[:50]}", file=sys.stderr)
         artigos.append({
             "url":      f"https://www.in.gov.br/en/web/dou/-/{url_title}",
             "titulo":   limpar_html(item.get("title") or item.get("titulo") or ""),
@@ -77,7 +102,7 @@ def buscar_leiturajornal(data_str: str) -> list[dict]:
             "resumo":   limpar_html(item.get("excerpt") or item.get("content") or item.get("ementa") or ""),
         })
 
-    print(f"    {len(artigos)} atos encontrados")
+    print(f"  ✓ {len(artigos)} atos encontrados para {data_str}")
     time.sleep(1)
     return artigos
 
@@ -86,10 +111,14 @@ def ler_last_run() -> datetime:
     """Lê last_run.txt ou usa fallback."""
     if LAST_RUN.exists():
         try:
-            return datetime.fromisoformat(LAST_RUN.read_text().strip())
-        except:
-            pass
-    return datetime.now() - timedelta(days=DIAS_FALLBACK)
+            dt = datetime.fromisoformat(LAST_RUN.read_text().strip())
+            print(f"  [DEBUG] last_run.txt: {dt}", file=sys.stderr)
+            return dt
+        except Exception as e:
+            print(f"  [DEBUG] Erro ao ler last_run.txt: {e}", file=sys.stderr)
+    fallback = datetime.now() - timedelta(days=DIAS_FALLBACK)
+    print(f"  [DEBUG] Usando fallback: {fallback}", file=sys.stderr)
+    return fallback
 
 
 def salvar_last_run():
@@ -102,6 +131,7 @@ def coletar_artigos() -> list[dict]:
     ultima = ler_last_run()
     hoje = datetime.now()
     dias = (hoje.date() - ultima.date()).days + 1
+    print(f"  [DEBUG] Período: {ultima.date()} até {hoje.date()} ({dias} dias)", file=sys.stderr)
 
     vistos = set()
     resultado = []
