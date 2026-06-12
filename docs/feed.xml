@@ -5,12 +5,12 @@
     <link>https://www.in.gov.br/consulta</link>
     <description>Atos normativos da Receita Federal do Brasil publicados no DOU</description>
     <language>pt-BR</language>
-    <lastBuildDate>Thu, 11 Jun 2026 20:08:51 +0000</lastBuildDate>
+    <lastBuildDate>Fri, 12 Jun 2026 15:20:10 +0000</lastBuildDate>
     <atom:link href="https://smrai74.github.io/normas-rfb-rss/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
       <title>Nenhum ato publicado</title>
       <link>https://www.in.gov.br/</link>
-      <pubDate>Thu, 11 Jun 2026 20:08:51 +0000</pubDate>
+      <pubDate>Fri, 12 Jun 2026 15:20:10 +0000</pubDate>
     </item>
   </channel>
 </rss>
